@@ -1,0 +1,98 @@
+// korabo_llm 設定ファイルのサンプル / Sample configuration
+//
+// 初回起動時、config.jsonc が無ければこのファイルが自動コピーされます。
+// On first launch, this file is auto-copied to config.jsonc if it does not exist.
+//
+// APIキーは config.jsonc に直接書かず、環境変数（api_key_env）を使うことを推奨します。
+// Prefer environment variables (api_key_env) over hard-coding API keys.
+// ※ config.jsonc は .gitignore 済み（WebUIで入力したキーはコミットされません）。
+{
+  "ui_lang": "ja", // "ja" or "en"
+  "endpoints": {
+    // "mock" はLLM未接続でも動作確認できるダミー / dummy endpoint for offline testing
+    "mock": {
+      "base_url": "mock",
+      "api_key": "",
+      "api_key_env": "",
+      "default_model": "mock-model",
+      "max_retries": 2,
+      "retry_backoff": 1.5
+    },
+    // ローカル推論サーバ (LM Studio / llama-server / Ollama 等)
+    "localhost": {
+      "base_url": "http://127.0.0.1:1234/v1",
+      "api_key": "localhost",
+      "api_key_env": "",
+      "default_model": "",
+      "max_retries": 2,
+      "retry_backoff": 1.5
+    },
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key": "",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "default_model": "anthropic/claude-sonnet-4.5",
+      "max_retries": 2,
+      "retry_backoff": 1.5
+    },
+    "openai": {
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "",
+      "api_key_env": "OPENAI_API_KEY",
+      "default_model": "gpt-4o",
+      "max_retries": 2,
+      "retry_backoff": 1.5
+    }
+  },
+  "master": {
+    "endpoint": "mock",
+    "model": "",
+    "prompt_file": "data/master/master_prompt.md",
+    "temperature": 0.7
+  },
+  "sub_defaults": {
+    "endpoint": "mock",
+    "model": "",
+    "temperature": 0.8
+  },
+  "roles": [
+    {
+      "id": "alice",
+      "name": "アリス",
+      "faction": "",
+      "endpoint": "",
+      "model": "",
+      "temperature": null,
+      "role_prompt_file": "data/roles/alice.md",
+      "memory_file": "data/memories/alice.md"
+    },
+    {
+      "id": "bob",
+      "name": "ボブ",
+      "faction": "",
+      "endpoint": "",
+      "model": "",
+      "temperature": null,
+      "role_prompt_file": "data/roles/bob.md",
+      "memory_file": "data/memories/bob.md"
+    }
+  ],
+  "run": {
+    "default_mode": "master_stop_limited",
+    "default_max_turns": 20,
+    "default_style": "",
+    "dials": [
+      { "label": "叙情的", "value": 4 },
+      { "label": "娯楽性", "value": 9 },
+      { "label": "突飛さ", "value": 1 },
+      { "label": "シリアス度", "value": 5 }
+    ],
+    "sub_in_main_log": true,
+    "sub_main_show_name": true,
+    "sub_main_show_action": true,
+    "sub_main_show_inner": true,
+    "narrative_style": "third",
+    "pov_role": "",
+    "narrative_custom": ""
+  }
+}

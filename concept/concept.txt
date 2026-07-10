@@ -1,0 +1,61 @@
+構築するシステムの目的はマスターLLMがありマスターLLMが管理するサブLLMがありそれらがコラボレートしながら様々なもの
+主に状況シミュレーション　（エージェントシミュレーションのようなもの）や
+マスターLLMが執筆者、あるいは語り手となり、サブLLMが登場人物として活動、会話をするような物語の生成などをできる仕組みを考えています
+
+実装は
+
+Python
++ OpenAI互換API
++ LangGraph
++ Gradio
++ JSONC (config file)
++ Markdown log
++ Markdown 個別ロールが持つ情報（記憶）
+
+を念頭に開発
+リアルタイムWebUIを持ちWebUIからプロンプトやその他の設定をすべて可能にしてください
+
+大まかなシステムの流れLLMの接続図は
+
+stateDiagram-v2
+
+SituationPrompt --> MasterLLM
+MasterPrompt --> MasterLLM
+MasterLLM --> SubLLM1
+SubLLM1 --> MasterLLM
+MasterLLM --> SubLLM2
+SubLLM2 --> MasterLLM
+MasterLLM --> SubLLM3
+SubLLM3 --> MasterLLM
+MasterLLM --> SubLLM4
+SubLLM4 --> MasterLLM
+MasterLLM --> SubLLM...
+SubLLM... --> MasterLLM
+memo_md1 --> SubLLM1
+SubLLM1 --> memo_md1
+memo_md2 --> SubLLM2
+SubLLM2 --> memo_md2
+memo_md3 --> SubLLM3
+SubLLM3 --> memo_md3
+memo_md4 --> SubLLM4
+SubLLM4 --> memo_md4
+memo_md... --> SubLLM...
+SubLLM... --> memo_md...
+RolePrompt1 --> SubLLM1
+RolePrompt2 --> SubLLM2
+RolePrompt3 --> SubLLM3
+RolePrompt4 --> SubLLM4
+RolePrompt... --> SubLLM...
+
+です（別途画像も添付）
+
+マスターLLMは重要なマスタープロンプトやその時々に指定されるシチュエーションプロンプトを理解し、
+マスタープロンプト自体が思考し、適切なタイミングで複数のサブLLM（ロールを担うLLM　例えば登場人物A　B　Cなど）に適切に必要な情報を与え
+解答を導きます。
+マスターLLMはその情報を統合しメインログとして出力します。
+
+サブLLMは個別のロール指定を読み込み稼働し、かつ個別に外部記憶となるようなテキストファイルを持ちます
+これは個々のサブLLMにとっての記憶やメモのようなものでサブLLMが書き込める仕組みにします
+
+出力はマスターLLMがまとめ編纂したものを最終出力としますが、
+マスターLLMとサブLLMとのやり取りやサブLLMが出力したログなども取得し閲覧可能な仕組みにします
