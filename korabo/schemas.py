@@ -33,6 +33,9 @@ class MasterConfig(BaseModel):
     model: str = ""
     prompt_file: str = "data/master/master_prompt.md"
     temperature: float = 0.7
+    memory_file: str = "data/memories/_master.md"  # 語り手（Master）の外部記憶
+    memory_enabled: bool = True  # Masterの記憶機能の有効・無効
+    directive: str = ""  # 最優先指令（絶対厳守・systemの最上位に前置される。空なら無効）
 
 
 class SubDefaults(BaseModel):
@@ -50,6 +53,7 @@ class RoleConfig(BaseModel):
     temperature: Optional[float] = None
     role_prompt_file: str = ""
     memory_file: str = ""
+    memory_enabled: bool = True  # このロール個別の記憶機能の有効・無効
 
 
 class Dial(BaseModel):
@@ -61,12 +65,15 @@ class Dial(BaseModel):
 class RunConfig(BaseModel):
     default_mode: str = "master_stop_limited"
     default_max_turns: int = 20
+    target_main_chars: int = 0  # 目指すmain.mdの文字数（0で無効）
     default_style: str = ""
     dials: list[Dial] = Field(default_factory=list)
+    sub_memory_enabled: bool = True    # サブ（キャラクターロール）全体の記憶機能の有効・無効
     sub_in_main_log: bool = True       # サブの生のセリフ・心情もメインログに反映するか
     sub_main_show_name: bool = True    # 生ブロックにロール名見出し（**名前**）を付けるか
     sub_main_show_action: bool = True  # 生ブロックに仕草・行動(action)を含めるか
     sub_main_show_inner: bool = True   # 生ブロックに（心の声）行を含めるか
+    sub_main_inner_prefix: str = "（心の声）"  # 心の声の接頭辞（空文字・空白も可）
     narrative_style: str = "third"     # third / first / script / custom
     pov_role: str = ""                 # narrative_style=first のときの視点ロールid
     narrative_custom: str = ""         # narrative_style=custom のときの自由記述指示
@@ -98,6 +105,7 @@ class MasterDecision(BaseModel):
     action: Literal["call_sub", "continue", "finish"] = "continue"
     target_role: str = ""
     message_to_role: str = ""
+    memory_append: str = ""  # 語り手の記憶メモに残したい内容（記憶機能が有効なときのみ）
 
 
 class SubResponse(BaseModel):
@@ -125,11 +133,13 @@ class SubResponse(BaseModel):
         show_name: bool = True,
         show_action: bool = True,
         show_inner: bool = True,
+        inner_prefix: str = "（心の声）",
     ) -> str:
         """メインログ反映用の整形ブロック（トグルON時）。
 
         show_name=False で名前見出し、show_action=False で仕草(action)、
         show_inner=False で（心の声）行を省略。全てFalseなら「セリフ」のみになる。
+        inner_prefix は心の声の接頭辞（空文字・空白も可。stripしない）。
         """
         lines: list[str] = []
         if show_name:
@@ -139,7 +149,7 @@ class SubResponse(BaseModel):
         if self.speech.strip():
             lines.append(f"「{self.speech.strip()}」")
         if show_inner and self.inner_voice.strip():
-            lines.append(f"（心の声）{self.inner_voice.strip()}")
+            lines.append(f"{inner_prefix}{self.inner_voice.strip()}")
         has_content = any(not l.startswith("**") for l in lines)
         if not has_content and self.reply.strip():
             lines.append(self.reply.strip())

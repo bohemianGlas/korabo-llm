@@ -65,10 +65,13 @@ def _start(
     style: str,
     mode_label: str,
     max_turns: float,
+    target_chars: float,
+    sub_memory: bool,
     sub_in_main: bool,
     show_name: bool,
     show_action: bool,
     show_inner: bool,
+    inner_prefix: str,
     narrative_label: str,
     pov_role: str,
     narrative_custom: str,
@@ -91,22 +94,28 @@ def _start(
         cfg = load_config()
         # 文体・方向性・味付け・叙述スタイル・ログ設定を次回起動時に復元できるよう設定に保存
         cfg.run.default_style = (style or "").strip()
+        cfg.run.target_main_chars = max(0, int(target_chars or 0))
         cfg.run.dials = [Dial(label=d["label"], value=d["value"]) for d in dials]
+        cfg.run.sub_memory_enabled = bool(sub_memory)
         cfg.run.sub_in_main_log = bool(sub_in_main)
         cfg.run.sub_main_show_name = bool(show_name)
         cfg.run.sub_main_show_action = bool(show_action)
         cfg.run.sub_main_show_inner = bool(show_inner)
+        cfg.run.sub_main_inner_prefix = inner_prefix if inner_prefix is not None else "（心の声）"
         cfg.run.narrative_style = narrative
         cfg.run.pov_role = (pov_role or "").strip()
         cfg.run.narrative_custom = (narrative_custom or "").strip()
         save_config(cfg)
         _runner = SessionRunner(
             cfg, situation, mode, int(max_turns or 20),
+            target_main_chars=max(0, int(target_chars or 0)),
             style=style, dials=dials,
+            sub_memory_enabled=bool(sub_memory),
             sub_in_main_log=bool(sub_in_main),
             sub_main_show_name=bool(show_name),
             sub_main_show_action=bool(show_action),
             sub_main_show_inner=bool(show_inner),
+            sub_main_inner_prefix=cfg.run.sub_main_inner_prefix,
             narrative_style=narrative,
             pov_role=pov_role,
             narrative_custom=narrative_custom,
@@ -276,6 +285,18 @@ def build() -> None:
                     minimum=1,
                     info=t("続き生成・実行中変更では「現在から追加Nターン」として扱われます"),
                 )
+                target_chars = gr.Number(
+                    label=t("目指すmain.md文字数（0で無効）"),
+                    value=_cfg0.run.target_main_chars,
+                    precision=0,
+                    minimum=0,
+                    info=t("Masterがこの分量を目安に配分・収束します（ターン上限とは別）"),
+                )
+            sub_memory_cb = gr.Checkbox(
+                label=t("サブ（キャラ）の記憶機能を有効にする（全ロール共通）"),
+                value=_cfg0.run.sub_memory_enabled,
+                info=t("OFFにすると全ロールが記憶を読み書きしません（個別ONでも全体OFFが優先）"),
+            )
             sub_in_main = gr.Checkbox(
                 label=t("サブの生のセリフ・心情もメインログに反映（OFFならMaster編纂のみ）"),
                 value=_cfg0.run.sub_in_main_log,
@@ -293,6 +314,12 @@ def build() -> None:
                 show_inner_cb = gr.Checkbox(
                     label=t("└ （心の声）を含める"),
                     value=_cfg0.run.sub_main_show_inner,
+                )
+                inner_prefix_tb = gr.Textbox(
+                    label=t("心の声の接頭辞"),
+                    value=_cfg0.run.sub_main_inner_prefix,
+                    placeholder=t("空欄で接頭辞なし"),
+                    max_lines=1,
                 )
             with gr.Row():
                 start_btn = gr.Button(t("▶ 開始"), variant="primary")
@@ -322,8 +349,9 @@ def build() -> None:
     start_btn.click(
         _start,
         inputs=[
-            situation, style, mode, max_turns,
-            sub_in_main, show_name_cb, show_action_cb, show_inner_cb,
+            situation, style, mode, max_turns, target_chars,
+            sub_memory_cb,
+            sub_in_main, show_name_cb, show_action_cb, show_inner_cb, inner_prefix_tb,
             narrative_dd, pov_dd, narrative_custom_tb,
             *dial_labels, *dial_values,
         ],

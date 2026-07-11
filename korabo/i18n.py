@@ -47,6 +47,9 @@ _EN: dict[str, str] = {
     "カスタム叙述指示": "Custom narrative instruction",
     "実行モード": "Run mode",
     "ターン上限": "Turn limit",
+    "目指すmain.md文字数（0で無効）": "Target main.md length in chars (0 = off)",
+    "Masterがこの分量を目安に配分・収束します（ターン上限とは別）":
+        "Master paces and wraps up toward this length (separate from turn limit)",
     "続き生成・実行中変更では「現在から追加Nターン」として扱われます":
         "For continue / live-change, this is 'N more turns from now'",
     "サブの生のセリフ・心情もメインログに反映（OFFならMaster編纂のみ）":
@@ -54,6 +57,12 @@ _EN: dict[str, str] = {
     "└ ロール名見出し（**名前**）を付ける": "└ Add role-name heading (**name**)",
     "└ 仕草・行動(action)を含める": "└ Include gesture/action",
     "└ （心の声）を含める": "└ Include (inner voice)",
+    "心の声の接頭辞": "Inner-voice prefix",
+    "空欄で接頭辞なし": "empty = no prefix",
+    "サブ（キャラ）の記憶機能を有効にする（全ロール共通）":
+        "Enable sub (character) memory (all roles)",
+    "OFFにすると全ロールが記憶を読み書きしません（個別ONでも全体OFFが優先）":
+        "Off = no role reads/writes memory (global off overrides per-role on)",
     "セリフだけを載せたい場合は、これをONにして下の3つ（名前・仕草・心の声）をすべてOFF":
         "For dialogue only: turn this ON and turn OFF all three below (name, action, inner voice)",
     "▶ 開始": "▶ Start",
@@ -104,6 +113,8 @@ _EN: dict[str, str] = {
     # 詳細ログタブ
     "セッション": "Session",
     "🔄 一覧更新": "🔄 Refresh list",
+    "⬇ main.md をダウンロード": "⬇ Download main.md",
+    "⬇ full.md をダウンロード": "⬇ Download full.md",
     "📖 メインログ (main.md)": "📖 Main log (main.md)",
     "🔍 フルログ (full.md)": "🔍 Full log (full.md)",
     "(セッション未選択)": "(no session selected)",
@@ -122,12 +133,24 @@ _EN: dict[str, str] = {
     "記憶メモ (memo_md)": "Memory note (memo_md)",
     "💾 記憶を保存": "💾 Save memory",
     "🧹 記憶をクリア": "🧹 Clear memory",
+    "記憶機能を有効にする": "Enable memory",
+    "OFFにするとこのロールは記憶を読み書きしません":
+        "Off = this role does not read/write memory",
 
     # マスター設定タブ
     "マスタープロンプト（Markdown）": "Master prompt (Markdown)",
     "モデル（空欄ならエンドポイントの既定値）": "Model (blank = endpoint default)",
     "💾 保存": "💾 Save",
     "🔄 再読込": "🔄 Reload",
+    "⭐ 最優先指令（絶対厳守・Markdown）": "⭐ Top-priority directive (must obey, Markdown)",
+    "例: - 登場人物を死なせない\n- 一次資料に無い固有名詞を捏造しない":
+        "e.g. - Never kill off characters\n- Do not invent proper nouns absent from sources",
+    "systemの最上位に前置され、他のすべての指示より優先されます（空欄で無効）":
+        "Prepended at the very top of the system prompt, overriding all other instructions (blank = off)",
+    "Masterの記憶機能を有効にする": "Enable Master memory",
+    "有効にするとMasterが記憶メモを読み書きします（設定・伏線・決定事項の保持）":
+        "On = Master reads/writes a memory note (settings, foreshadowing, decisions)",
+    "Masterの記憶メモ (memo_md)": "Master memory note (memo_md)",
 
     # 接続設定タブ
     "エンドポイント一覧": "Endpoints",

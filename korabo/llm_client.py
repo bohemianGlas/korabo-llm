@@ -41,15 +41,66 @@ _FATAL_ERRORS = (
 # JSON応答の堅牢パース
 # ---------------------------------------------------------------------------
 
+def _escape_ctrl_in_strings(text: str) -> str:
+    """JSON文字列リテラル内の生制御文字（改行・タブ等）をエスケープして修復する。
+
+    LLMは speech 等の値の中に生の改行（段落分け）を入れがちだが、これは
+    json/json5 とも不正。文字列内のみ \\n 等へ置換し、文字列外の整形は保つ。
+    """
+    out: list[str] = []
+    in_string = False
+    escape = False
+    for ch in text:
+        if in_string:
+            if escape:
+                escape = False
+                out.append(ch)
+            elif ch == "\\":
+                escape = True
+                out.append(ch)
+            elif ch == '"':
+                in_string = False
+                out.append(ch)
+            elif ch == "\n":
+                out.append("\\n")
+            elif ch == "\r":
+                out.append("\\r")
+            elif ch == "\t":
+                out.append("\\t")
+            else:
+                out.append(ch)
+        else:
+            if ch == '"':
+                in_string = True
+            out.append(ch)
+    return "".join(out)
+
+
 def _try_parse(text: str) -> dict | None:
-    for parser in (json.loads, json5.loads):
-        try:
-            obj = parser(text)
-            if isinstance(obj, dict):
-                return obj
-        except Exception:
-            pass
+    candidates = (text, _escape_ctrl_in_strings(text))
+    for candidate in candidates:
+        for parser in (json.loads, json5.loads):
+            try:
+                obj = parser(candidate)
+                if isinstance(obj, dict):
+                    return obj
+            except Exception:
+                pass
     return None
+
+
+def strip_code_fences(text: str) -> str:
+    """先頭・末尾のコードフェンス（```lang / ```）を剥がす（本文中は触らない）。"""
+    t = text.strip()
+    if t.startswith("```"):
+        first_nl = t.find("\n")
+        if first_nl >= 0:
+            t = t[first_nl + 1 :]
+        else:
+            t = t[3:]
+    if t.rstrip().endswith("```"):
+        t = t.rstrip()[:-3]
+    return t.strip()
 
 
 def _first_balanced_object(text: str) -> str | None:

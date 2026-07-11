@@ -76,12 +76,15 @@ class SessionRunner:
         situation: str,
         mode: str,
         max_turns: int,
+        target_main_chars: int = 0,
         style: str = "",
         dials: list[dict] | None = None,
+        sub_memory_enabled: bool = True,
         sub_in_main_log: bool = True,
         sub_main_show_name: bool = True,
         sub_main_show_action: bool = True,
         sub_main_show_inner: bool = True,
+        sub_main_inner_prefix: str = "（心の声）",
         narrative_style: str = "third",
         pov_role: str = "",
         narrative_custom: str = "",
@@ -90,16 +93,19 @@ class SessionRunner:
         self.situation = situation.strip()
         self.style = (style or "").strip()
         self.dials = [d for d in (dials or []) if str(d.get("label", "")).strip()]
+        self.sub_memory_enabled = bool(sub_memory_enabled)
         self.sub_in_main_log = bool(sub_in_main_log)
         self.sub_main_show_name = bool(sub_main_show_name)
         self.sub_main_show_action = bool(sub_main_show_action)
         self.sub_main_show_inner = bool(sub_main_show_inner)
+        self.sub_main_inner_prefix = sub_main_inner_prefix  # stripしない（空白も尊重）
         self.narrative_style = (narrative_style or "third").strip()
         self.narrative_custom = (narrative_custom or "").strip()
         pov = cfg.get_role((pov_role or "").strip())
         self.pov_label = (pov.name or pov.id) if pov else ""
         self.mode = mode
         self.max_turns = int(max_turns) if mode in _USES_LIMIT else None
+        self.target_main_chars = max(0, int(target_main_chars or 0))
 
         self.turn = 0
         self.history: list[dict] = []
@@ -120,6 +126,9 @@ class SessionRunner:
         self.logger = SessionLogger()
 
         m = cfg.master
+        self.master_memory_enabled = bool(getattr(m, "memory_enabled", True))
+        self.master_memory_file = getattr(m, "memory_file", "") or ""
+        self.master_directive = getattr(m, "directive", "") or ""
         self.master_prompt = load_master_prompt(m.prompt_file) or "あなたは物語の語り手です。"
         endpoint = cfg.endpoints.get(m.endpoint)
         if endpoint is None:
@@ -140,6 +149,10 @@ class SessionRunner:
 
     def main_log_md(self) -> str:
         return "\n\n".join(self._main_md) or "（まだ出力がありません）"
+
+    def _main_char_count(self) -> int:
+        """これまでにmain.mdへ書かれた本文のおおよその文字数。"""
+        return sum(len(b) for b in self._main_md)
 
     def detail_log_md(self, last: int = 120) -> str:
         blocks = self._detail_md[-last:]
@@ -313,6 +326,11 @@ class SessionRunner:
             interventions = self._interventions[:]
             self._interventions.clear()
 
+        master_memory = (
+            read_memory(self.master_memory_file)
+            if self.master_memory_enabled and self.master_memory_file
+            else ""
+        )
         messages = build_master_messages(
             self.master_prompt,
             self.situation,
@@ -327,6 +345,11 @@ class SessionRunner:
             self.pov_label,
             self.narrative_custom,
             self.sub_in_main_log,
+            master_memory_enabled=self.master_memory_enabled,
+            master_memory=master_memory,
+            directive=self.master_directive,
+            target_main_chars=self.target_main_chars,
+            current_main_chars=self._main_char_count(),
         )
         for t in interventions:
             self.history.append({"kind": "intervention", "text": t})
@@ -361,6 +384,11 @@ class SessionRunner:
             self.finished = True
             self._emit("finished", text="Masterが物語の完結を宣言しました。")
 
+        # 語り手（Master）の記憶追記（記憶機能が有効なときのみ）
+        if self.master_memory_enabled and decision.memory_append and self.master_memory_file:
+            append_memory(self.master_memory_file, decision.memory_append)
+            self._emit("memory_update", role="Master", text=decision.memory_append)
+
         self._last_decision = decision
         return decision
 
@@ -370,7 +398,13 @@ class SessionRunner:
             return
         client = self._get_sub_client(role)
         role_prompt = _read_text(role.role_prompt_file) or f"あなたは「{role.name or role.id}」です。"
-        memory_text = read_memory(role.memory_file) if role.memory_file else ""
+        # サブの記憶機能: 全体ON かつ 個別ON かつ ファイル有り のときのみ読み書きする
+        mem_on = (
+            self.sub_memory_enabled
+            and bool(getattr(role, "memory_enabled", True))
+            and bool(role.memory_file)
+        )
+        memory_text = read_memory(role.memory_file) if mem_on else ""
 
         messages = build_sub_messages(
             role,
@@ -402,11 +436,12 @@ class SessionRunner:
                 show_name=self.sub_main_show_name,
                 show_action=self.sub_main_show_action,
                 show_inner=self.sub_main_show_inner,
+                inner_prefix=self.sub_main_inner_prefix,
             )
             if block.strip():
                 self._add_to_main(block)
 
-        if resp.memory_append and role.memory_file:
+        if mem_on and resp.memory_append:
             append_memory(role.memory_file, resp.memory_append)
             self._emit("memory_update", role=role.id, text=resp.memory_append)
 
