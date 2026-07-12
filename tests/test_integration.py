@@ -7,7 +7,7 @@ import time
 import pytest
 
 from korabo.memory import extract_memory_section, memory_template, read_memory
-from korabo.schemas import AppConfig, EndpointConfig, MasterConfig, RoleConfig, SubDefaults
+from korabo.schemas import AppConfig, EndpointConfig, MasterConfig, RoleConfig
 from korabo.session import SessionRunner
 
 
@@ -35,10 +35,9 @@ def _cfg(tmp_path) -> AppConfig:
     return AppConfig(
         endpoints={"mock": EndpointConfig(base_url="mock")},
         master=MasterConfig(endpoint="mock", memory_enabled=False),
-        sub_defaults=SubDefaults(endpoint="mock"),
         roles=[
-            RoleConfig(id="a", name="アキラ", faction="A", memory_file=str(mem_a)),
-            RoleConfig(id="b", name="ベル", faction="B", memory_file=str(mem_b)),
+            RoleConfig(id="a", name="アキラ", faction="A", endpoint="mock", memory_file=str(mem_a)),
+            RoleConfig(id="b", name="ベル", faction="B", endpoint="mock", memory_file=str(mem_b)),
         ],
     )
 

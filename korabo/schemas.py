@@ -39,19 +39,13 @@ class MasterConfig(BaseModel):
     directive: str = ""  # 最優先指令（絶対厳守・systemの最上位に前置される。空なら無効）
 
 
-class SubDefaults(BaseModel):
-    endpoint: str = "mock"
-    model: str = ""
-    temperature: float = 0.8
-
-
 class RoleConfig(BaseModel):
     id: str
     name: str = ""
     faction: str = ""   # 陣営（例: A / B / C）。空なら「設定なし」で影響を与えない
-    endpoint: str = ""  # 空なら sub_defaults を使用
-    model: str = ""     # 空なら endpoint の default_model / sub_defaults を使用
-    temperature: Optional[float] = None
+    endpoint: str = ""  # このロールのSub接続先。空なら mock/先頭エンドポイントへフォールバック
+    model: str = ""     # 空なら endpoint の default_model
+    temperature: Optional[float] = None  # 空(None)なら既定 0.8
     role_prompt_file: str = ""
     memory_file: str = ""
     memory_enabled: bool = True  # このロール個別の記憶機能の有効・無効
@@ -85,7 +79,6 @@ class AppConfig(BaseModel):
     prompt_lang: str = "ja"  # システム指示プロンプトの言語 / system-instruction language ("ja" or "en")
     endpoints: dict[str, EndpointConfig] = Field(default_factory=dict)
     master: MasterConfig = Field(default_factory=MasterConfig)
-    sub_defaults: SubDefaults = Field(default_factory=SubDefaults)
     roles: list[RoleConfig] = Field(default_factory=list)
     run: RunConfig = Field(default_factory=RunConfig)
 

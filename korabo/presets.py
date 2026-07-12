@@ -23,7 +23,7 @@ import json5
 
 from .config import load_config, save_config
 from .prompts import find_includes
-from .schemas import AppConfig, Dial, MasterConfig, RoleConfig, RunConfig, SubDefaults
+from .schemas import AppConfig, Dial, MasterConfig, RoleConfig, RunConfig
 
 PRESETS_DIR = Path("presets")
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -90,12 +90,9 @@ def apply_preset(preset_id: str, cfg: AppConfig | None = None) -> str:
         directive=cfg.master.directive,
     )
 
-    sd = data.get("sub_defaults", {})
-    cfg.sub_defaults = SubDefaults(
-        endpoint=cfg.sub_defaults.endpoint,  # 接続先は保持
-        model=str(sd.get("model", "")),
-        temperature=float(sd.get("temperature", cfg.sub_defaults.temperature)),
-    )
+    # 旧プリセットの sub_defaults は、ロールの空欄を埋める既定値として取り込む（後方互換）
+    sd = data.get("sub_defaults", {}) or {}
+    sd_ep, sd_model, sd_temp = sd.get("endpoint", ""), sd.get("model", ""), sd.get("temperature")
 
     roles: list[RoleConfig] = []
     for r in data.get("roles", []):
@@ -104,9 +101,9 @@ def apply_preset(preset_id: str, cfg: AppConfig | None = None) -> str:
                 id=str(r["id"]),
                 name=str(r.get("name", "")),
                 faction=str(r.get("faction", "")),
-                endpoint=str(r.get("endpoint", "")),  # 名前参照のみ（ローカルconfigの同名を利用）
-                model=str(r.get("model", "")),
-                temperature=r.get("temperature"),
+                endpoint=str(r.get("endpoint", "") or sd_ep),  # 名前参照のみ（ローカルconfigの同名を利用）
+                model=str(r.get("model", "") or sd_model),
+                temperature=r.get("temperature") if r.get("temperature") is not None else sd_temp,
                 role_prompt_file=rel(r.get("role_prompt_file", f"roles/{r['id']}.md")),
                 memory_file=rel(r.get("memory_file", f"memories/{r['id']}.md")),
                 memory_enabled=bool(r.get("memory_enabled", True)),
@@ -199,7 +196,6 @@ def save_current_as_preset(preset_id: str, display_name: str = "") -> str:
             "prompt_file": "master/master_prompt.md",
             "important_prompt_file": "master/important_prompt.md",
         },
-        "sub_defaults": {"model": cfg.sub_defaults.model, "temperature": cfg.sub_defaults.temperature},
         "roles": roles_manifest,
         "run": {
             "target_main_chars": cfg.run.target_main_chars,

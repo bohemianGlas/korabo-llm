@@ -125,6 +125,15 @@ _EN: dict[str, str] = {
     "(セッション未選択)": "(no session selected)",
 
     # ロール管理タブ
+    "### 🎛 Sub LLM（全ロールへ一括適用）": "### 🎛 Sub LLM (apply to all roles at once)",
+    "💾 全ロールに適用（Sub LLMを一括設定）": "💾 Apply to all roles (set Sub LLM at once)",
+    "temperature も一括適用する（OFFならキャラごとの値を保持）":
+        "Also apply temperature to all (off = keep each character's value)",
+    "endpoint・model は全ロール共通。temperature は一括／キャラごとの両方で設定できます。":
+        "endpoint & model are shared by all roles; temperature can be set both at once and per character.",
+    "temperature（このキャラクター）": "temperature (this character)",
+    "このキャラだけの生成温度。上の一括適用でも上書きできます":
+        "Sampling temperature for this character only; can also be overwritten by the bulk apply above",
     "ロール一覧": "Roles",
     "➕ 新規": "➕ New",
     "🗑 削除": "🗑 Delete",

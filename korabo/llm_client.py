@@ -230,7 +230,7 @@ class MockLLMClient(LLMClient):
     FINISH_AT = 6
 
     def __init__(self, endpoint: EndpointConfig, model: str, temperature: float = 0.7, **_kwargs):
-        self.model = model or "mock-model"
+        self.model = model or "mock"
         self.temperature = temperature
         self.max_retries = 0
         self.retry_backoff = 0.0

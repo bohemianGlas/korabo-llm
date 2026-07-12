@@ -21,7 +21,29 @@ def load_config(path: Path | str = CONFIG_PATH) -> AppConfig:
     if not p.exists():
         return AppConfig()
     data = json5.loads(p.read_text(encoding="utf-8"))
+    _migrate_sub_defaults(data)
     return AppConfig.model_validate(data)
+
+
+def _migrate_sub_defaults(data: dict) -> None:
+    """旧 `sub_defaults`（全ロール共通のSub設定）を各ロールへ取り込んで廃止する。
+
+    旧構成では role.endpoint/model/temperature が空のとき sub_defaults を使っていた。
+    その意味を保つため、空のロール項目へ sub_defaults の値を埋めてから sub_defaults を落とす。
+    """
+    sd = data.pop("sub_defaults", None)
+    if not isinstance(sd, dict):
+        return
+    ep, model, temp = sd.get("endpoint", ""), sd.get("model", ""), sd.get("temperature")
+    for r in data.get("roles", []):
+        if not isinstance(r, dict):
+            continue
+        if not r.get("endpoint"):
+            r["endpoint"] = ep
+        if not r.get("model"):
+            r["model"] = model
+        if r.get("temperature") is None and temp is not None:
+            r["temperature"] = temp
 
 
 def save_config(cfg: AppConfig, path: Path | str = CONFIG_PATH) -> None:

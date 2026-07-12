@@ -488,16 +488,21 @@ class SessionRunner:
             e["present"] = list(self._current_present)
         self.history.append(e)
 
+    def _fallback_endpoint(self) -> str:
+        """ロールに endpoint 未設定のときの保険。mock があれば mock、無ければ先頭。"""
+        if "mock" in self.cfg.endpoints:
+            return "mock"
+        return next(iter(self.cfg.endpoints), "")
+
     def _get_sub_client(self, role: RoleConfig):
         if role.id in self._sub_clients:
             return self._sub_clients[role.id]
-        ep_name = role.endpoint or self.cfg.sub_defaults.endpoint
+        ep_name = role.endpoint or self._fallback_endpoint()
         endpoint = self.cfg.endpoints.get(ep_name)
         if endpoint is None:
             raise ValueError(f"ロール '{role.id}' のエンドポイント '{ep_name}' が未定義です")
-        model = role.model or self.cfg.sub_defaults.model
-        temp = role.temperature if role.temperature is not None else self.cfg.sub_defaults.temperature
-        client = create_client(endpoint, model, temp)
+        temp = role.temperature if role.temperature is not None else 0.8
+        client = create_client(endpoint, role.model, temp)
         self._sub_clients[role.id] = client
         return client
 

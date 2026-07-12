@@ -75,9 +75,12 @@ def _log_startup(args) -> None:
             return "mock" if (ep and ep.base_url.strip().lower() == "mock") else "実LLM"
 
         m = cfg.master
-        sd = cfg.sub_defaults
         applog.info(f"Master : {m.endpoint} / {m.model or '(既定)'} [{_ep(m.endpoint)}]")
-        applog.info(f"Sub    : {sd.endpoint} / {sd.model or '(既定)'} [{_ep(sd.endpoint)}]")
+        if cfg.roles:
+            r0 = cfg.roles[0]
+            same = all((r.endpoint, r.model) == (r0.endpoint, r0.model) for r in cfg.roles)
+            suffix = "" if same else " (ロールごとに異なる)"
+            applog.info(f"Sub    : {r0.endpoint} / {r0.model or '(既定)'} [{_ep(r0.endpoint)}]{suffix}")
         preset = active_preset_id(cfg) or "custom (data/)"
         applog.info(f"ロール数: {len(cfg.roles)} ｜ プリセット: {preset}")
     except Exception as e:

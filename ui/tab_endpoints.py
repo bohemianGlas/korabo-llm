@@ -51,8 +51,6 @@ def _delete(name: str):
     users = [r.id for r in cfg.roles if r.endpoint == name]
     if cfg.master.endpoint == name:
         users.append("master")
-    if cfg.sub_defaults.endpoint == name:
-        users.append("sub_defaults")
     if users:
         gr.Warning(f"このエンドポイントは {', '.join(users)} が使用中のため削除できません。")
         return gr.update(), "削除に失敗しました"

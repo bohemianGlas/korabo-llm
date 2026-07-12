@@ -15,7 +15,7 @@
       "base_url": "mock",
       "api_key": "",
       "api_key_env": "",
-      "default_model": "mock-model",
+      "default_model": "",
       "max_retries": 2,
       "retry_backoff": 1.5
     },
@@ -55,19 +55,16 @@
     "memory_enabled": true,
     "directive": ""
   },
-  "sub_defaults": {
-    "endpoint": "mock",
-    "model": "",
-    "temperature": 0.8
-  },
+  // Sub LLM（endpoint/model/temperature）は各ロールが持つ。
+  // WebUIの「🎛 Sub LLM（全ロールへ一括適用）」で全ロールへ一斉設定できる。
   "roles": [
     {
       "id": "alice",
       "name": "アリス",
       "faction": "",
-      "endpoint": "",
+      "endpoint": "mock",
       "model": "",
-      "temperature": null,
+      "temperature": 0.8,
       "role_prompt_file": "data/roles/alice.md",
       "memory_file": "data/memories/alice.md",
       "memory_enabled": true
@@ -76,9 +73,9 @@
       "id": "bob",
       "name": "ボブ",
       "faction": "",
-      "endpoint": "",
+      "endpoint": "mock",
       "model": "",
-      "temperature": null,
+      "temperature": 0.8,
       "role_prompt_file": "data/roles/bob.md",
       "memory_file": "data/memories/bob.md",
       "memory_enabled": true
