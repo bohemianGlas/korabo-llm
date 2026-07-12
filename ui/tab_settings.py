@@ -28,6 +28,12 @@ def _apply_prompt_lang(lang: str) -> str:
     return i18n.t("保存しました（次に「開始」したセッションから反映されます）")
 
 
+def _restart() -> str:
+    """アプリを再起動する。ブラウザは RECONNECT_JS で復帰後に自動再接続する。"""
+    appcontrol.schedule_restart()
+    return i18n.t("再起動しています…（数秒で自動的に再接続します）")
+
+
 def build() -> None:
     t = i18n.t
     gr.Markdown(f"## {t('⚙ 設定')}")
@@ -56,5 +62,13 @@ def build() -> None:
 
     # 将来のオプションはこの下に gr.Group() を足していく（例: テーマ、既定モデル 等）
 
+    # --- アプリの再起動 ---
+    with gr.Group():
+        gr.Markdown(t("### 🔄 アプリの再起動"))
+        gr.Markdown(t("設定変更の反映やUIの再構築のためにアプリを再起動します（実行中のセッションは停止します）。"))
+        restart_btn = gr.Button(t("🔄 再起動"), variant="stop")
+        restart_status = gr.Markdown("")
+
     apply_btn.click(_apply_language, inputs=[lang_dd]).then(None, js=appcontrol.RECONNECT_JS)
     prompt_lang_btn.click(_apply_prompt_lang, inputs=[prompt_lang_dd], outputs=[prompt_lang_status])
+    restart_btn.click(_restart, outputs=[restart_status]).then(None, js=appcontrol.RECONNECT_JS)

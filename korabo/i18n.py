@@ -43,6 +43,12 @@ _EN: dict[str, str] = {
         "Language of the common Master/Sub instructions and output format. Independent of the story's output language (set that in the work prompts)",
     "保存しました（次に「開始」したセッションから反映されます）":
         "Saved (takes effect from the next session you start)",
+    "### 🔄 アプリの再起動": "### 🔄 Restart the app",
+    "設定変更の反映やUIの再構築のためにアプリを再起動します（実行中のセッションは停止します）。":
+        "Restart the app to apply setting changes or rebuild the UI (any running session will stop).",
+    "🔄 再起動": "🔄 Restart",
+    "再起動しています…（数秒で自動的に再接続します）":
+        "Restarting… (it will reconnect automatically in a few seconds)",
 
     # 実行タブ
     "シチュエーションプロンプト": "Situation prompt",
