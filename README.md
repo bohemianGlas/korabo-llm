@@ -91,6 +91,64 @@ the **🧠 Master** and **🎭 Roles** tabs.
   Master, a local LLM for the roles).
 - If a role's endpoint/model is unset, the `sub_defaults` values are used.
 
+### Local model sizing (llama.cpp)
+
+Context stays bounded regardless of story length because the history windows are fixed
+(**Master 40 events / Sub 20 events**); the only steadily-growing input is each role's memory note
+(`memo_md`, sent in full every call). Estimated context use (Japanese ≈ 1.2–1.6 chars/token):
+
+| | Typical | Long story / large memory |
+|---|---|---|
+| **Master input** | 11,000–15,000 tok | 18,000–25,000 tok |
+| **Sub input** | 7,000–9,700 tok | 10,000–14,000 tok |
+
+**Recommended `--ctx-size` (n_ctx):** Master **16K min / 24K** for long-form; Sub **8K min / 12K**.
+
+**`--parallel`** — the app calls Master → Sub **sequentially** on a single thread (roles never run
+concurrently), and llama.cpp splits `n_ctx` across slots, so:
+- **Two dedicated servers (recommended):** each `--parallel 1`.
+- **One server for both:** `--parallel 2` and **double the total `n_ctx`** (e.g. 32K → 16K per slot),
+  so Master and Sub keep separate cached slots and alternating calls don't re-prefill.
+- No need to scale `--parallel` with the number of roles.
+
+**`--batch-size` / `--ubatch-size`** — prefill speed vs VRAM only (not correctness). `-b 2048 -ub 512`
+(defaults) is fine; raise `-ub 1024` to speed up prefill of long prompts if VRAM allows.
+
+```bash
+# Dedicated Master / Sub servers
+llama-server -m master.gguf --ctx-size 16384 --parallel 1 -b 2048 -ub 512
+llama-server -m sub.gguf    --ctx-size 12288 --parallel 1 -b 2048 -ub 512
+# One server for both
+llama-server -m shared.gguf --ctx-size 32768 --parallel 2 -b 2048 -ub 512
+```
+
+### Local model sizing (vLLM)
+
+This is a **single-user, strictly sequential** workload (Master → Sub, never concurrent), so each
+turn is a large **prefill** (Master 10–25K tok, Sub 7–14K tok) plus a small generation (~500–600 tok).
+There are no competing concurrent decodes to protect, so tune toward fast prefill.
+
+- **`--max-model-len`**: same as n_ctx above — Master **16384–24576**, Sub **12288**.
+- **`--max-num-batched-tokens`**: set high enough to prefill a full prompt in few chunks (lowers TTFT).
+  Master **16384** (8192 if VRAM-tight), Sub **8192**. A single sequence's KV need is modest, so a
+  larger value is affordable. With chunked prefill (default), it may be below `--max-model-len` (the
+  prompt is just split). On very tight VRAM the default is fine — only TTFT grows, not correctness.
+- **`--max-num-seqs`**: 1–2 is plenty (only one request is ever in flight). Use 2 when one server hosts both.
+- **`--enable-prefix-caching`** (big win): the stable head of the system prompt (base prompts + work
+  master prompt + fixed sections) is reused across turns. Note the memory note (`memo_md`) sits
+  mid-prompt, so caching helps up to the memory section.
+
+```bash
+# Dedicated Master / Sub servers
+vllm serve <master-model> --max-model-len 16384 --max-num-batched-tokens 16384 \
+    --max-num-seqs 2 --enable-prefix-caching
+vllm serve <sub-model>    --max-model-len 12288 --max-num-batched-tokens 8192 \
+    --max-num-seqs 1 --enable-prefix-caching
+# One server for both
+vllm serve <shared-model> --max-model-len 24576 --max-num-batched-tokens 16384 \
+    --max-num-seqs 2 --enable-prefix-caching
+```
+
 ## Usage
 
 ### Run tab
@@ -135,6 +193,14 @@ MasterPrompt ────┤
 - Master ⇔ Sub exchanges use structured JSON (`MasterDecision` / `SubResponse`). To work with local
   models that don't support function-calling, this is done via prompt instructions plus robust
   parsing; if parsing fails, the whole text is treated as narration/speech so the run never stalls.
+- **Responsibility boundaries** (system-wide base prompts): the Master manages the world and
+  outcomes but never decides a character's speech/decisions/inner thoughts; Subs act as
+  limited-knowledge agents that write only their own *attempts*, never outcomes. Sub context is
+  assembled as a **scene packet** — invisible information (other factions' secrets, others' inner
+  voice, events from scenes the character was absent from) is **excluded before it is sent**, not
+  forbidden afterwards. Role memories support a structured 7-section format with tag-based routing
+  (［事実］［伝聞］［推測］…) and exact-duplicate suppression — old free-form memories keep working.
+  See [docs/prompt-and-state-architecture.md](docs/prompt-and-state-architecture.md).
 
 ### Master ⇔ Sub protocol
 
@@ -228,6 +294,18 @@ In the **🎁 Presets** tab you can save the master prompt (+ include children),
 - "Save current setup" turns your current `data/` into a preset.
 - **Bundle** — Export/import a preset as a single readable Markdown file `<id>.preset.md`
   (for sharing / backup). The working format stays a directory; endpoints are not included in a bundle.
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+```
+
+All tests run offline with mock/scripted LLM clients (visibility isolation, scene packets,
+memory routing/dedup, prompt assembly, and an end-to-end session).
+Note: `full.md` is by design the *complete* debug log — it contains inner voices, faction
+secrets and scene-packet summaries. Share `main.md` if you only want the story.
 
 ## License / Notes
 

@@ -1,4 +1,4 @@
-"""マスター設定タブ: マスタープロンプト・接続設定・記憶メモ。"""
+"""マスター設定タブ: マスタープロンプト・重要プロンプト・接続設定・記憶メモ。"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,12 +7,21 @@ import gradio as gr
 
 from korabo.config import load_config, save_config
 from korabo.i18n import t
-from korabo.memory import read_memory, write_memory
+from korabo.memory import master_state_template, read_memory, write_memory
+from korabo.prompts import IMPORTANT_PROMPT_TEMPLATE, ensure_important_prompt
 
 
 def _read_prompt(cfg) -> str:
     p = cfg.master.prompt_file
     return Path(p).read_text(encoding="utf-8") if p and Path(p).exists() else ""
+
+
+def _read_important(cfg) -> str:
+    p = cfg.master.important_prompt_file
+    if not p:
+        return IMPORTANT_PROMPT_TEMPLATE
+    ensure_important_prompt(p)  # 無ければテンプレートを書き込む
+    return Path(p).read_text(encoding="utf-8")
 
 
 def _load():
@@ -22,6 +31,7 @@ def _load():
     return (
         m.directive,
         _read_prompt(cfg),
+        _read_important(cfg),
         gr.update(choices=list(cfg.endpoints.keys()), value=m.endpoint),
         m.model,
         m.temperature,
@@ -31,7 +41,8 @@ def _load():
     )
 
 
-def _save(directive: str, prompt: str, endpoint: str, model: str, temperature: float, memory_enabled: bool):
+def _save(directive: str, prompt: str, important: str, endpoint: str, model: str,
+          temperature: float, memory_enabled: bool):
     cfg = load_config()
     m = cfg.master
     m.directive = directive or ""
@@ -43,8 +54,20 @@ def _save(directive: str, prompt: str, endpoint: str, model: str, temperature: f
     p = Path(m.prompt_file)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(prompt or "", encoding="utf-8")
+    if m.important_prompt_file:
+        ip = Path(m.important_prompt_file)
+        ip.parent.mkdir(parents=True, exist_ok=True)
+        ip.write_text(important or "", encoding="utf-8")
     save_config(cfg)
     return "マスター設定を保存しました"
+
+
+def _reset_important():
+    """重要プロンプトをテンプレートへ戻す（＝未使用状態にする）。"""
+    cfg = load_config()
+    if cfg.master.important_prompt_file:
+        write_memory(cfg.master.important_prompt_file, IMPORTANT_PROMPT_TEMPLATE)
+    return IMPORTANT_PROMPT_TEMPLATE, "重要プロンプトをテンプレートに戻しました（未使用状態）"
 
 
 def _save_memory(memory_text: str):
@@ -61,9 +84,9 @@ def _clear_memory():
     if not cfg.master.memory_file:
         gr.Warning("Masterの記憶ファイルが未設定です。")
         return gr.update(), "クリアに失敗しました"
-    header = "# 語り手（Master）の記憶メモ\n"
-    write_memory(cfg.master.memory_file, header)
-    return header, "Masterの記憶をクリアしました"
+    template = master_state_template(cfg.prompt_lang)
+    write_memory(cfg.master.memory_file, template)
+    return template, "Masterの記憶をクリアしました"
 
 
 def build() -> None:
@@ -82,6 +105,13 @@ def build() -> None:
                 lines=14,
                 value=_read_prompt(cfg),
             )
+            important_tb = gr.Textbox(
+                label=t("重要プロンプト（作品の設計図・Markdown）"),
+                lines=14,
+                value=_read_important(cfg),
+                info=t("テンプレートを埋めると毎ターンMasterの判断基準になります。テンプレートのまま（未記入）なら一切注入されません"),
+            )
+            important_reset_btn = gr.Button(t("↩ 重要プロンプトをテンプレートに戻す"))
             mem_enabled_cb = gr.Checkbox(
                 label=t("Masterの記憶機能を有効にする"),
                 value=cfg.master.memory_enabled,
@@ -110,12 +140,14 @@ def build() -> None:
 
     save_btn.click(
         _save,
-        inputs=[directive_tb, prompt_tb, ep_dd, model_tb, temp_sl, mem_enabled_cb],
+        inputs=[directive_tb, prompt_tb, important_tb, ep_dd, model_tb, temp_sl, mem_enabled_cb],
         outputs=[status],
     )
     reload_btn.click(
         _load,
-        outputs=[directive_tb, prompt_tb, ep_dd, model_tb, temp_sl, mem_enabled_cb, memory_tb, status],
+        outputs=[directive_tb, prompt_tb, important_tb, ep_dd, model_tb, temp_sl,
+                 mem_enabled_cb, memory_tb, status],
     )
+    important_reset_btn.click(_reset_important, outputs=[important_tb, status])
     mem_save_btn.click(_save_memory, inputs=[memory_tb], outputs=[status])
     mem_clear_btn.click(_clear_memory, outputs=[memory_tb, status])

@@ -1,0 +1,3 @@
+# 開発・テスト用依存 / dev & test dependencies
+-r requirements.txt
+pytest>=8.0

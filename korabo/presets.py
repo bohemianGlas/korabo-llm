@@ -82,6 +82,12 @@ def apply_preset(preset_id: str, cfg: AppConfig | None = None) -> str:
         model=str(m.get("model", "")),
         prompt_file=rel(m.get("prompt_file", "master/master_prompt.md")),
         temperature=float(m.get("temperature", cfg.master.temperature)),
+        # 重要プロンプトは作品一式の一部（preset内を指す。無ければ未使用として扱われる）
+        important_prompt_file=rel(m.get("important_prompt_file", "master/important_prompt.md")),
+        # 記憶設定・最優先指令はマシンローカル設定として保持（デフォルト戻りを防ぐ）
+        memory_file=cfg.master.memory_file,
+        memory_enabled=cfg.master.memory_enabled,
+        directive=cfg.master.directive,
     )
 
     sd = data.get("sub_defaults", {})
@@ -103,6 +109,7 @@ def apply_preset(preset_id: str, cfg: AppConfig | None = None) -> str:
                 temperature=r.get("temperature"),
                 role_prompt_file=rel(r.get("role_prompt_file", f"roles/{r['id']}.md")),
                 memory_file=rel(r.get("memory_file", f"memories/{r['id']}.md")),
+                memory_enabled=bool(r.get("memory_enabled", True)),
             )
         )
     cfg.roles = roles
@@ -111,11 +118,15 @@ def apply_preset(preset_id: str, cfg: AppConfig | None = None) -> str:
     cfg.run = RunConfig(
         default_mode=cfg.run.default_mode,
         default_max_turns=cfg.run.default_max_turns,
+        target_main_chars=int(run.get("target_main_chars", 0) or 0),
         default_style=str(run.get("default_style", "")),
         dials=[Dial(label=str(x.get("label", "")), value=int(x.get("value", 5))) for x in run.get("dials", [])],
+        sub_memory_enabled=bool(run.get("sub_memory_enabled", True)),
         sub_in_main_log=bool(run.get("sub_in_main_log", True)),
         sub_main_show_name=bool(run.get("sub_main_show_name", True)),
+        sub_main_show_action=bool(run.get("sub_main_show_action", True)),
         sub_main_show_inner=bool(run.get("sub_main_show_inner", True)),
+        sub_main_inner_prefix=str(run.get("sub_main_inner_prefix", "（心の声）")),
         narrative_style=str(run.get("narrative_style", "third")),
         pov_role=str(run.get("pov_role", "")),
         narrative_custom=str(run.get("narrative_custom", "")),
@@ -157,6 +168,9 @@ def save_current_as_preset(preset_id: str, display_name: str = "") -> str:
             child = master_src.parent / name
             if child.exists():
                 _copy_into(str(child), d / "master" / name)
+    # 重要プロンプト（作品の設計図）も作品一式としてコピー
+    if cfg.master.important_prompt_file:
+        _copy_into(cfg.master.important_prompt_file, d / "master" / "important_prompt.md")
 
     # ロールごとの prompt / memory
     roles_manifest = []
@@ -173,6 +187,7 @@ def save_current_as_preset(preset_id: str, display_name: str = "") -> str:
                 "temperature": r.temperature,
                 "role_prompt_file": f"roles/{r.id}.md",
                 "memory_file": f"memories/{r.id}.md",
+                "memory_enabled": r.memory_enabled,
             }
         )
 
@@ -182,15 +197,20 @@ def save_current_as_preset(preset_id: str, display_name: str = "") -> str:
             "model": cfg.master.model,
             "temperature": cfg.master.temperature,
             "prompt_file": "master/master_prompt.md",
+            "important_prompt_file": "master/important_prompt.md",
         },
         "sub_defaults": {"model": cfg.sub_defaults.model, "temperature": cfg.sub_defaults.temperature},
         "roles": roles_manifest,
         "run": {
+            "target_main_chars": cfg.run.target_main_chars,
             "default_style": cfg.run.default_style,
             "dials": [{"label": x.label, "value": x.value} for x in cfg.run.dials],
+            "sub_memory_enabled": cfg.run.sub_memory_enabled,
             "sub_in_main_log": cfg.run.sub_in_main_log,
             "sub_main_show_name": cfg.run.sub_main_show_name,
+            "sub_main_show_action": cfg.run.sub_main_show_action,
             "sub_main_show_inner": cfg.run.sub_main_show_inner,
+            "sub_main_inner_prefix": cfg.run.sub_main_inner_prefix,
             "narrative_style": cfg.run.narrative_style,
             "pov_role": cfg.run.pov_role,
             "narrative_custom": cfg.run.narrative_custom,
@@ -269,6 +289,7 @@ def export_preset_bundle(preset_id: str, out_path: str | Path | None = None) -> 
     if master_abs.exists():
         for name in find_includes(master_abs.read_text(encoding="utf-8")):
             _add((Path(master_rel).parent / name).as_posix())
+    _add(manifest.get("master", {}).get("important_prompt_file", "master/important_prompt.md"))
     for r in manifest.get("roles", []):
         _add(r.get("role_prompt_file", f"roles/{r['id']}.md"))
         _add(r.get("memory_file", f"memories/{r['id']}.md"))

@@ -38,6 +38,11 @@ _EN: dict[str, str] = {
     "APPLY": "APPLY",
     "※ 言語の変更は、適用時にアプリを再起動して反映されます。":
         "Note: applying a language change restarts the app to take effect.",
+    "システム指示プロンプトの言語": "System-instruction prompt language",
+    "Master/Subへの共通指示・出力形式の言語。物語の出力言語とは独立（作品プロンプト側で指定）":
+        "Language of the common Master/Sub instructions and output format. Independent of the story's output language (set that in the work prompts)",
+    "保存しました（次に「開始」したセッションから反映されます）":
+        "Saved (takes effect from the next session you start)",
 
     # 実行タブ
     "シチュエーションプロンプト": "Situation prompt",
@@ -147,6 +152,10 @@ _EN: dict[str, str] = {
         "e.g. - Never kill off characters\n- Do not invent proper nouns absent from sources",
     "systemの最上位に前置され、他のすべての指示より優先されます（空欄で無効）":
         "Prepended at the very top of the system prompt, overriding all other instructions (blank = off)",
+    "重要プロンプト（作品の設計図・Markdown）": "Key prompt (story blueprint, Markdown)",
+    "テンプレートを埋めると毎ターンMasterの判断基準になります。テンプレートのまま（未記入）なら一切注入されません":
+        "Fill in the template to make it the Master's per-turn criteria. If left as the unmodified template, it is never injected",
+    "↩ 重要プロンプトをテンプレートに戻す": "↩ Reset key prompt to template",
     "Masterの記憶機能を有効にする": "Enable Master memory",
     "有効にするとMasterが記憶メモを読み書きします（設定・伏線・決定事項の保持）":
         "On = Master reads/writes a memory note (settings, foreshadowing, decisions)",

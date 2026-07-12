@@ -4,6 +4,7 @@ Simple English starter templates for korabo_llm.
 
 | File | Purpose | Paste into |
 |---|---|---|
+| `meta_prompt_guide.md` | **Have a large LLM generate a full preset** from your rough idea | paste whole file + your idea into ChatGPT/Claude → save output as `<id>.preset.md` → import in 🎁 Presets tab |
 | `master_prompt_novel.md` | Master prompt for novel-style writing | 🧠 Master tab → master prompt |
 | `situation_template.md` | Situation template (era, place, opening) | ▶ Run tab → situation prompt |
 | `role_template.md` | Character (role) prompt template | 🎭 Roles tab → role prompt |

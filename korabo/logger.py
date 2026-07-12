@@ -65,6 +65,10 @@ def format_event_md(e: dict) -> str:
         return f"🎭 **本文へ反映 (T{turn})**\n\n{text}\n"
     if t == "memory_update":
         return f"📝 **{role} の記憶に追記 (T{turn})**: {text}\n"
+    if t == "memory_skip":
+        return f"📝 **{role} の記憶追記を重複スキップ (T{turn})**: {text}\n"
+    if t == "scene_packet":
+        return f"🗺 **場面パケット → {role} (T{turn})**: {text}\n"
     if t == "intervention":
         return f"⚡ **ユーザー介入 (T{turn})**: {text}\n"
     if t == "situation":

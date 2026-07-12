@@ -7,7 +7,8 @@
 // Prefer environment variables (api_key_env) over hard-coding API keys.
 // ※ config.jsonc は .gitignore 済み（WebUIで入力したキーはコミットされません）。
 {
-  "ui_lang": "ja", // "ja" or "en"
+  "ui_lang": "ja", // WebUI表示言語 / UI language: "ja" or "en"
+  "prompt_lang": "ja", // システム指示プロンプトの言語 / system-instruction language: "ja" or "en"
   "endpoints": {
     // "mock" はLLM未接続でも動作確認できるダミー / dummy endpoint for offline testing
     "mock": {
@@ -49,6 +50,7 @@
     "model": "",
     "prompt_file": "data/master/master_prompt.md",
     "temperature": 0.7,
+    "important_prompt_file": "data/master/important_prompt.md",
     "memory_file": "data/memories/_master.md",
     "memory_enabled": true,
     "directive": ""

@@ -112,6 +112,10 @@ def log_session_event(turn: int, etype: str, payload: dict) -> None:
         logger.debug(f"💭 {t} Master思考: {_preview(text)}")
     elif etype == "sub_inner":
         logger.debug(f"💭 {t} {role}の心の声: {_preview(text)}")
+    elif etype == "scene_packet":
+        logger.debug(f"🗺 {t} 場面パケット→{role}: {_preview(text, 160)}")
+    elif etype == "memory_skip":
+        logger.debug(f"📝 {t} {role} 記憶追記を重複スキップ: {_preview(text, 60)}")
     elif etype == "error":
         logger.error(f"❌ {t} {_preview(text, 200)}")
     # sub_main は sub_reply と重複するため出さない

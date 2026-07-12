@@ -8,7 +8,7 @@ import gradio as gr
 
 from korabo.config import load_config, save_config
 from korabo.i18n import t
-from korabo.memory import read_memory, write_memory
+from korabo.memory import memory_template, read_memory, write_memory
 from korabo.schemas import RoleConfig
 
 _DEFAULT_EP = "（既定を使用）"
@@ -68,7 +68,7 @@ def _save_role(
     Path(role.role_prompt_file).parent.mkdir(parents=True, exist_ok=True)
     Path(role.role_prompt_file).write_text(prompt or "", encoding="utf-8")
     if role.memory_file and not Path(role.memory_file).exists():
-        write_memory(role.memory_file, f"# {role.name or role.id} の記憶メモ\n")
+        write_memory(role.memory_file, memory_template(role.name or role.id, cfg.prompt_lang))
 
     save_config(cfg)
     return gr.update(choices=_role_choices(), value=role_id), f"「{role_id}」を保存しました"
@@ -104,9 +104,9 @@ def _clear_memory(role_id: str):
     if role is None or not role.memory_file:
         gr.Warning("ロールが選択されていないか、記憶ファイルが未設定です。")
         return gr.update(), "クリアに失敗しました"
-    header = f"# {role.name or role.id} の記憶メモ\n"
-    write_memory(role.memory_file, header)
-    return header, f"「{role_id}」の記憶をクリアしました"
+    template = memory_template(role.name or role.id, cfg.prompt_lang)
+    write_memory(role.memory_file, template)
+    return template, f"「{role_id}」の記憶をクリアしました"
 
 
 def _refresh():

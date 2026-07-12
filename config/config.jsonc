@@ -1,5 +1,6 @@
 {
   "ui_lang": "ja",
+  "prompt_lang": "ja",
   "endpoints": {
     "mock": {
       "base_url": "mock",
@@ -47,6 +48,7 @@
     "model": "",
     "prompt_file": "data/master/master_prompt.md",
     "temperature": 0.7,
+    "important_prompt_file": "data/master/important_prompt.md",
     "memory_file": "data/memories/_master.md",
     "memory_enabled": true,
     "directive": ""

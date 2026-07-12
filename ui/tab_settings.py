@@ -20,6 +20,14 @@ def _apply_language(lang: str) -> None:
     appcontrol.schedule_restart()
 
 
+def _apply_prompt_lang(lang: str) -> str:
+    """システム指示プロンプトの言語を config に保存する（次回セッション開始から反映・再起動不要）。"""
+    cfg = load_config()
+    cfg.prompt_lang = "en" if str(lang).lower().startswith("en") else "ja"
+    save_config(cfg)
+    return i18n.t("保存しました（次に「開始」したセッションから反映されます）")
+
+
 def build() -> None:
     t = i18n.t
     gr.Markdown(f"## {t('⚙ 設定')}")
@@ -34,6 +42,19 @@ def build() -> None:
         apply_btn = gr.Button(t("APPLY"), variant="primary")
     gr.Markdown(t("※ 言語の変更は、適用時にアプリを再起動して反映されます。"))
 
+    # --- システム指示プロンプトの言語（出力言語とは独立） ---
+    with gr.Group():
+        cfg0 = load_config()
+        prompt_lang_dd = gr.Dropdown(
+            label=t("システム指示プロンプトの言語"),
+            choices=[("日本語 / Japanese", "ja"), ("English", "en")],
+            value=getattr(cfg0, "prompt_lang", "ja"),
+            info=t("Master/Subへの共通指示・出力形式の言語。物語の出力言語とは独立（作品プロンプト側で指定）"),
+        )
+        prompt_lang_btn = gr.Button(t("💾 保存"))
+        prompt_lang_status = gr.Markdown("")
+
     # 将来のオプションはこの下に gr.Group() を足していく（例: テーマ、既定モデル 等）
 
     apply_btn.click(_apply_language, inputs=[lang_dd]).then(None, js=appcontrol.RECONNECT_JS)
+    prompt_lang_btn.click(_apply_prompt_lang, inputs=[prompt_lang_dd], outputs=[prompt_lang_status])

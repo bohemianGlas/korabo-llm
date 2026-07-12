@@ -16,9 +16,10 @@ from .llm_client import create_client
 from .logger import SessionLogger, format_event_md
 from .master import build_master_messages, parse_master_decision
 from .memory import append_memory, read_memory
-from .prompts import load_master_prompt
+from .prompts import load_important_prompt, load_master_prompt
+from .scene import build_scene_packet, packet_debug_summary
 from .schemas import AppConfig, MasterDecision, RoleConfig
-from .sub import build_sub_messages, parse_sub_response
+from .sub import SUB_HISTORY_WINDOW, build_sub_messages, parse_sub_response
 
 MODE_LABELS = {
     "step": "1ステップずつ",
@@ -109,6 +110,8 @@ class SessionRunner:
 
         self.turn = 0
         self.history: list[dict] = []
+        # Masterが申告した「現ターンの在席ロールid」（presence可視性用。無ければNone）
+        self._current_present: list[str] | None = None
         self.finished = False
         self.paused = False
         self.stopped = False
@@ -129,6 +132,8 @@ class SessionRunner:
         self.master_memory_enabled = bool(getattr(m, "memory_enabled", True))
         self.master_memory_file = getattr(m, "memory_file", "") or ""
         self.master_directive = getattr(m, "directive", "") or ""
+        self.master_important_file = getattr(m, "important_prompt_file", "") or ""
+        self.prompt_lang = getattr(cfg, "prompt_lang", "ja") or "ja"
         self.master_prompt = load_master_prompt(m.prompt_file) or "あなたは物語の語り手です。"
         endpoint = cfg.endpoints.get(m.endpoint)
         if endpoint is None:
@@ -350,6 +355,9 @@ class SessionRunner:
             directive=self.master_directive,
             target_main_chars=self.target_main_chars,
             current_main_chars=self._main_char_count(),
+            # テンプレ未変更なら空が返り、注入されない（内容に左右されない）
+            important_prompt=load_important_prompt(self.master_important_file),
+            lang=self.prompt_lang,
         )
         for t in interventions:
             self.history.append({"kind": "intervention", "text": t})
@@ -357,6 +365,13 @@ class SessionRunner:
         raw = self._master_client.chat(messages, on_retry=self._on_retry("Master"))
         self._track_usage(self._master_client)
         decision = parse_master_decision(raw)
+
+        # Masterが場面の在席者を申告したターンは、履歴イベントにpresenceを付与する
+        self._current_present = (
+            list(decision.scene.present_roles)
+            if decision.scene and decision.scene.present_roles
+            else None
+        )
 
         if decision.action == "finish" and self.mode not in _RESPECTS_FINISH:
             decision.action = "continue"
@@ -374,20 +389,20 @@ class SessionRunner:
             self._emit("master_thought", text=decision.thought)
         if decision.narration:
             self._append_main(decision.narration, "narration")
-            self.history.append({"kind": "narration", "text": decision.narration})
+            self._hist("narration", text=decision.narration)
         if decision.action == "call_sub":
             self._emit("sub_call", role=decision.target_role, text=decision.message_to_role)
-            self.history.append(
-                {"kind": "master_to_sub", "role": decision.target_role, "text": decision.message_to_role}
-            )
+            self._hist("master_to_sub", role=decision.target_role, text=decision.message_to_role)
         if decision.action == "finish":
             self.finished = True
             self._emit("finished", text="Masterが物語の完結を宣言しました。")
 
         # 語り手（Master）の記憶追記（記憶機能が有効なときのみ）
         if self.master_memory_enabled and decision.memory_append and self.master_memory_file:
-            append_memory(self.master_memory_file, decision.memory_append)
-            self._emit("memory_update", role="Master", text=decision.memory_append)
+            if append_memory(self.master_memory_file, decision.memory_append, turn=self.turn):
+                self._emit("memory_update", role="Master", text=decision.memory_append)
+            else:
+                self._emit("memory_skip", role="Master", text=decision.memory_append)
 
         self._last_decision = decision
         return decision
@@ -406,6 +421,19 @@ class SessionRunner:
         )
         memory_text = read_memory(role.memory_file) if mem_on else ""
 
+        # 場面パケット: Subへ渡す可視情報をここで一括組立・フィルタ（渡す前に除外）
+        packet = build_scene_packet(
+            self.turn,
+            decision,
+            role,
+            self.cfg.roles,
+            self.history,
+            memory_text=memory_text,
+            window=SUB_HISTORY_WINDOW,
+            lang=self.prompt_lang,
+        )
+        self._emit("scene_packet", role=role.id, text=packet_debug_summary(packet))
+
         messages = build_sub_messages(
             role,
             role_prompt,
@@ -414,6 +442,8 @@ class SessionRunner:
             decision.message_to_role,
             self.history,
             self.cfg.roles,
+            scene_packet=packet,
+            lang=self.prompt_lang,
         )
         raw = client.chat(messages, on_retry=self._on_retry(role.name or role.id))
         self._track_usage(client)
@@ -422,12 +452,12 @@ class SessionRunner:
         name = role.name or role.id
         outward = resp.outward_text()
         self._emit("sub_reply", role=role.id, text=outward)
-        self.history.append({"kind": "sub_to_master", "role": role.id, "text": outward})
+        self._hist("sub_to_master", role=role.id, text=outward)
 
         # 心の声：Master・本人には見えるが他キャラには見えない（filter_history_for_roleで隔離）
         if resp.inner_voice.strip():
             self._emit("sub_inner", role=role.id, text=resp.inner_voice.strip())
-            self.history.append({"kind": "sub_inner", "role": role.id, "text": resp.inner_voice.strip()})
+            self._hist("sub_inner", role=role.id, text=resp.inner_voice.strip())
 
         # トグルON時、サブの生のセリフ・言動・心の声をメインログにも反映（指令は含めない）
         if self.sub_in_main_log:
@@ -442,12 +472,21 @@ class SessionRunner:
                 self._add_to_main(block)
 
         if mem_on and resp.memory_append:
-            append_memory(role.memory_file, resp.memory_append)
-            self._emit("memory_update", role=role.id, text=resp.memory_append)
+            if append_memory(role.memory_file, resp.memory_append, turn=self.turn):
+                self._emit("memory_update", role=role.id, text=resp.memory_append)
+            else:
+                self._emit("memory_skip", role=role.id, text=resp.memory_append)
 
     # ------------------------------------------------------------------
     # 内部ヘルパ
     # ------------------------------------------------------------------
+
+    def _hist(self, kind: str, **payload) -> None:
+        """履歴イベントを追加する。Masterが在席者を申告していればpresenceを付与。"""
+        e = {"kind": kind, **payload}
+        if self._current_present:
+            e["present"] = list(self._current_present)
+        self.history.append(e)
 
     def _get_sub_client(self, role: RoleConfig):
         if role.id in self._sub_clients:

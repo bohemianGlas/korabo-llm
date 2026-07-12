@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +33,7 @@ class MasterConfig(BaseModel):
     model: str = ""
     prompt_file: str = "data/master/master_prompt.md"
     temperature: float = 0.7
+    important_prompt_file: str = "data/master/important_prompt.md"  # 重要プロンプト（作品の設計図）
     memory_file: str = "data/memories/_master.md"  # 語り手（Master）の外部記憶
     memory_enabled: bool = True  # Masterの記憶機能の有効・無効
     directive: str = ""  # 最優先指令（絶対厳守・systemの最上位に前置される。空なら無効）
@@ -81,6 +82,7 @@ class RunConfig(BaseModel):
 
 class AppConfig(BaseModel):
     ui_lang: str = "ja"  # WebUIの表示言語 / UI display language ("ja" or "en")
+    prompt_lang: str = "ja"  # システム指示プロンプトの言語 / system-instruction language ("ja" or "en")
     endpoints: dict[str, EndpointConfig] = Field(default_factory=dict)
     master: MasterConfig = Field(default_factory=MasterConfig)
     sub_defaults: SubDefaults = Field(default_factory=SubDefaults)
@@ -98,6 +100,27 @@ class AppConfig(BaseModel):
 # Master ⇔ Sub プロトコル
 # ---------------------------------------------------------------------------
 
+class SceneInfo(BaseModel):
+    """Masterが申告する現在の場面情報（call_sub時・任意）。
+
+    present_roles は「その場に居合わせているロールid」。設定されたターンの
+    出来事は、不在ロールの履歴から自動的に除外される（presence可視性）。
+    """
+    location: str = ""
+    time: str = ""
+    present_roles: list[str] = Field(default_factory=list)
+    constraints: str = ""
+
+    @field_validator("present_roles", mode="before")
+    @classmethod
+    def _coerce_roles(cls, v):
+        if isinstance(v, str):
+            return [p.strip() for p in v.replace("、", ",").split(",") if p.strip()]
+        if isinstance(v, list):
+            return [str(x).strip() for x in v if str(x).strip()]
+        return []
+
+
 class MasterDecision(BaseModel):
     """MasterLLM の1ターンの出力。"""
     thought: str = ""
@@ -106,6 +129,20 @@ class MasterDecision(BaseModel):
     target_role: str = ""
     message_to_role: str = ""
     memory_append: str = ""  # 語り手の記憶メモに残したい内容（記憶機能が有効なときのみ）
+    scene: Optional[SceneInfo] = None  # 現在の場面（任意。不正な形状はNoneに落とす）
+
+    @field_validator("scene", mode="before")
+    @classmethod
+    def _tolerant_scene(cls, v):
+        # sceneフィールドの不備でMasterDecision全体のパースを壊さない
+        if v is None or isinstance(v, SceneInfo):
+            return v
+        if isinstance(v, dict):
+            try:
+                return SceneInfo.model_validate(v)
+            except Exception:
+                return None
+        return None
 
 
 class SubResponse(BaseModel):
